@@ -18,6 +18,4 @@ Before generating masks and obtaining data, each well's images must be stitched 
 * `Preview`: press to preview the output of the image stitcher. NOTE: the image may take a few seconds to display in the preview window, depending on the size of your images.
 
 
-[ add image here with example data ] 
-
-# Step 2: 
+etc etc
