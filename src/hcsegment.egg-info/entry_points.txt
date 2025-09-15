@@ -1,0 +1,2 @@
+[console_scripts]
+hcsegment = hcsegment.cli:main

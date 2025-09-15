@@ -1,0 +1,4 @@
+.DS_Store
+csv_logs
+checkpoints
+tb_logs
