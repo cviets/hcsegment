@@ -6,31 +6,7 @@ from iohub.ngff import open_ome_zarr
 from glob import glob
 from .io_utils import get_positions, get_timepoint_dirs, convert_position_list, sort_files, get_grid_position
 from typing import List
-
-def tiff_to_zarr_OLD(root_dir, store_path):
-
-    well = "B02"
-    image = tifffile.imread(os.path.join(root_dir, well+".tif"))
-    shape = (301, 1, 1, 1024, 1024)
-    dtype = np.uint16
-
-    if store_path: 
-        with open_ome_zarr(
-            store_path=store_path,
-            layout="fov",
-            mode="a",
-            channel_names=["GCaMP"]
-        ) as dataset:
-            img = dataset.create_zeros(
-            name=well,
-            shape=shape,
-            dtype=dtype,
-            chunks=(1, 1, 1, 1024, 1024)  # chunk by XY planes
-            )
-            for t in tqdm(range(shape[0])):
-                # write 4D image data for the time point
-                img[t] = np.expand_dims(image[t], (0,1))
-            dataset.print_tree()
+from .normalizations import minmax
 
 def tiff_to_zarr(root_dir: str, store_path: str, rows: int, columns: int, channel_names: List[str]) -> None:
     """

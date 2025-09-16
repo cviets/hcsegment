@@ -3,7 +3,9 @@ import zarr
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
-from ..src.hcsegment.modules.normalizations import minmax, minmax_percentile
+from src.hcsegment.modules.normalizations import minmax, minmax_percentile
+from iohub.ngff import open_ome_zarr
+import zarr
 
 def compute_autocorrelation(img_window, vertical_lag=10, horizontal_lag=10):
 
@@ -35,4 +37,16 @@ fig, axs = plt.subplots(1,3,figsize=(8,10))
 axs[0].imshow(img[0,:,:])
 axs[1].imshow(img_window)
 axs[2].matshow(compute_autocorrelation(img_window))
+# %%
+
+with open_ome_zarr(
+    store_path="/Volumes/Chris2/Exp001E/HCS_zarr.zarr/A/10/0",
+    layout="hcs",
+    mode="r"
+    ) as dataset:
+    dataset.print_tree()
+
+# %%
+x = zarr.open("/Volumes/Chris2/Exp001E/HCS_zarr.zarr/A/10/0")
+print(not x.group_keys())
 # %%

@@ -14,5 +14,6 @@ src/hcsegment/modules/denoise.py
 src/hcsegment/modules/image_stitch.py
 src/hcsegment/modules/io_utils.py
 src/hcsegment/modules/normalizations.py
+tests/test_denoise.py
 tests/test_io_utils.py
 tests/test_to_zarr.py
