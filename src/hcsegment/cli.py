@@ -1,6 +1,7 @@
 import argparse
 from .run_to_zarr import main as to_zarr_main
 from .run_denoise import main as denoise_main
+from .run_mask_nuclei import main as nuclear_main
 
 def main():
 
@@ -16,6 +17,11 @@ def main():
 
     denoise_parser = subparsers.add_parser("denoise", help="Denoise images using N2V")
 
+    nuclear_parser = subparsers.add_parser("mask-nuclei", help="Segment and count nuclei")
+    nuclear_parser.add_argument("-m", "--min_size", type=int, default=100, required=False, help="Min object size")
+    nuclear_parser.add_argument("-M", "--max_size", type=int, default=2000, required=False, help="Max object size")
+    nuclear_parser.add_argument("-d", "--dist", type=int, default=20, required=False, help="Min distance between objects")
+    
     args = parser.parse_args()
     if args.command == "to_zarr":
         if args.channel_names == "default_channel":
@@ -26,6 +32,9 @@ def main():
 
     elif args.command == "denoise":
         denoise_main()
+
+    elif args.command == "mask-nuclei":
+        nuclear_main(args.dist, args.min_size, args.max_size)
 
 if __name__ == '__main__':
     main()

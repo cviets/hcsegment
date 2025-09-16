@@ -1,4 +1,4 @@
-from src.hcsegment.modules.io_utils import sort_files, get_timepoint_dirs, get_positions, find_zarrs_in_folder
+from src.hcsegment.modules.io_utils import sort_files, get_timepoint_dirs, get_positions
 from glob import glob
 import os
 import re
@@ -40,9 +40,5 @@ def test_sort_files_main():
     passed = test_sort_files(inp1, inp2)
     print(f"Passed: {passed}")
 
-def test_get_zarrs():
-    root_dir = "/Volumes/Chris2/Exp001E/HCS_zarr.zarr"
-    print(find_zarrs_in_folder(root_dir))
-
 if __name__ == '__main__':
-    test_get_zarrs()
+    test_sort_files_main()

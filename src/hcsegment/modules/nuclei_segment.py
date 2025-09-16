@@ -5,6 +5,7 @@ from skimage.segmentation import watershed
 from skimage import morphology
 from numpy.typing import NDArray
 from typing import Union
+import copy
 
 def local_maxima(
         image: NDArray[np.float64], 
@@ -14,27 +15,41 @@ def local_maxima(
     maxima = max_filtered == image
     return maxima
 
-def semantic_segment(image: NDArray[np.float64], min_size, max_size) -> NDArray[np.bool_]:
+def semantic_segment(
+        image: NDArray[np.float64], 
+        min_size: Union[int,None]=None, 
+        max_size: Union[int,None]=None
+        ) -> NDArray[np.bool_]:
+    
     maxima = local_maxima(image)
+
+    # remove large background and small objects
     maxima = filter_by_size(maxima, min_size, max_size)
+
+    # fill donut-shaped objects
     out1 =  binary_opening(binary_fill_holes(maxima), structure=np.ones((3,3)))
+    # out1 =  binary_fill_holes(maxima)
+
     # make sure we don't pick up on dark structures
     out2 = image>np.percentile(image, 50)
     assert type(out1[0,0]) == np.bool_, type(out1[0,0])
     assert type(out2[0,0]) == np.bool_, type(out2[0,0])
     return out1 & out2
 
-def filter_by_size(img: Union[NDArray[np.bool_], NDArray[np.int32]], min_size: int, max_size: int) -> NDArray[np.bool_]:
+def filter_by_size(img: Union[NDArray[np.bool_], NDArray[np.int32]], min_size: Union[int, None], max_size: Union[int, None]) -> NDArray[np.bool_]:
     """
     Filter binary or labeled segmentation image by object size
     """
-    out = morphology.remove_small_objects(img, min_size)
-    too_large = morphology.remove_small_objects(out, max_size)
-    if type(out[0,0]) == np.int32:
-        out = out - too_large
-    else:
-        assert type(out[0,0]) == np.bool_
-        out = out ^ too_large
+    out = copy.deepcopy(img)
+    if min_size is not None:
+        out = morphology.remove_small_objects(out, min_size)
+    if max_size is not None:
+        too_large = morphology.remove_small_objects(out, max_size)
+        if type(out[0,0]) == np.int32:
+            out = out - too_large
+        else:
+            assert type(out[0,0]) == np.bool_
+            out = out ^ too_large
     return out
 
 def instance_segment(
@@ -59,4 +74,3 @@ def instance_segment(
     instance_segmentation = filter_by_size(instance_segmentation, min_object_size, max_object_size)
 
     return instance_segmentation
-
