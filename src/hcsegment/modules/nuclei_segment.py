@@ -6,6 +6,8 @@ from skimage import morphology
 from numpy.typing import NDArray
 from typing import Union
 import copy
+from .io_utils import get_files_in_path, save_tiff, read_image, write_image, get_wellname_from_imagepath, write_to_csv
+from tqdm import tqdm
 
 def local_maxima(
         image: NDArray[np.float64], 
@@ -28,7 +30,6 @@ def semantic_segment(
 
     # fill donut-shaped objects
     out1 =  binary_opening(binary_fill_holes(maxima), structure=np.ones((3,3)))
-    # out1 =  binary_fill_holes(maxima)
 
     # make sure we don't pick up on dark structures
     out2 = image>np.percentile(image, 50)
@@ -55,9 +56,12 @@ def filter_by_size(img: Union[NDArray[np.bool_], NDArray[np.int32]], min_size: U
 def instance_segment(
         denoised_image: NDArray[np.float64], 
         min_dist_btwn_cells: int=20, 
-        min_object_size: int=100,
+        min_object_size: int=80,
         max_object_size: int=2000
         ) -> NDArray[np.int32]:
+    
+    if denoised_image.ndim > 2:
+        return np.array([instance_segment(elt) for elt in denoised_image])
     
     working_img = minmax(denoised_image)
     working_img_seg = minmax_percentile(denoised_image, 3, 97)
@@ -74,3 +78,70 @@ def instance_segment(
     instance_segmentation = filter_by_size(instance_segmentation, min_object_size, max_object_size)
 
     return instance_segmentation
+
+def instance_segment_path(
+        input: str, 
+        output: str, 
+        nuclear_channel: int, 
+        min_dist: int, 
+        min_size: int, 
+        max_size: int, 
+        save_results: bool
+        ) -> None:
+    """
+    Create and save instance segmentations for all images in specified path
+
+    Parameters
+    -------------
+    input : str
+        Path to directory containing images
+    output : str
+        Path to directory to save segmentations
+    nuclear_channel : int
+        Channel number containing cell nuclei (zero-indexed)
+    min_dist : int
+        Minimum pixel distance between cells
+    min_size : int
+        Minimum size of objects to count
+    max_size : int
+        Maximum size of objects to count
+    save_results : bool
+        Whether to save the cell counts in a CSV file
+    """
+
+    if output == "" or output is None:
+        output = input + "_nuclear_masks"
+
+    images, format = get_files_in_path(input)
+    example_image = read_image(images[0], format)
+
+    if save_results:
+        results_table = np.zeros((1+example_image.shape[0], len(images)), dtype=str)
+
+    for i, image_path in enumerate(tqdm(images, desc="Nuclear masks")):
+        wellname = get_wellname_from_imagepath(image_path)
+        image = read_image(image_path, format)
+        assert image.ndim == 5, "Saved images must be 5-dimensional (TCZYX)"
+        assert image.shape[2] == 1, ("Currently only supports images with one z-slice", image.shape)
+        
+        image = np.squeeze(image[:,nuclear_channel,:,:,:])
+        segmentation = instance_segment(image, min_dist, min_size, max_size)
+
+        assert segmentation.ndim <= 3
+        if segmentation.ndim == 2:
+            # add empty time dimension if needed
+            np.expand_dims(segmentation, 0)
+
+        if save_results:
+            num_cells = np.array([str(len(np.unique(elt)) - 1) for elt in segmentation])
+            results_table[0,i] = wellname
+            results_table[1:,i] = num_cells
+
+        segmentation = np.expand_dims(segmentation, 1)
+        segmentation = np.expand_dims(segmentation, 2)
+
+        write_image(segmentation, output, wellname, format)
+
+    if save_results:
+        results_table = np.vstack((["Well", ""], results_table))
+        write_to_csv(results_table, output+"_DATA.csv")

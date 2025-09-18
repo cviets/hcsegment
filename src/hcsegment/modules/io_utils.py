@@ -5,6 +5,10 @@ from glob import glob
 import numpy as np
 from tqdm import tqdm
 import copy
+import tifffile
+import zarr
+from iohub.ngff import open_ome_zarr
+import csv
 
 def get_positions(file_list: List[str]) -> Tuple[List[str], int, int]:
 
@@ -137,3 +141,89 @@ def get_grid_position(site: int, rows: int, cols: int) -> Tuple[int]:
     assert j >= 0 and j < rows
     
     return (j, i)
+
+def get_files_in_path(inp_path: str) -> Tuple[List[str], str]:
+    """
+    Given the input path, returns the images in the path and their format (tiff or zarr)
+    """
+    out = []
+    inp_path = os.path.expanduser(inp_path)
+    tiffs = glob(os.path.join(inp_path, "*.tif"))
+    tiffs.extend(glob(os.path.join(inp_path, "*.tiff")))
+
+    if len(tiffs) == 0:
+        subdirs = [elt for elt in os.listdir(inp_path) if os.path.isdir(elt)]
+        for subdir in subdirs:
+            subsubdirs = [elt for elt in os.listdir(subdir) if os.path.isdir(elt)]
+            for subsubdir in subdirs:
+                out.append(os.path.join(inp_path, subdir, subsubdir, "0", "0"))
+
+        return out, "zarr"
+    else: 
+        return tiffs, "tiff"
+    
+def save_tiff(data, filename):
+    tifffile.imwrite(filename, data)
+
+def read_image(path_to_img: str, format: str) -> np.ndarray:
+    assert format in {"tiff", "zarr"}, "Only tiff and zarr reading supported"
+    if format == "tiff":
+        return np.array(tifffile.imread(path_to_img))
+    else:
+        return np.array(zarr.open(path_to_img))
+    
+def write_image(data: np.ndarray, output: str, well: str, format: str) -> None:
+    """
+    Write image data in tiff or zarr format
+
+    Parameters
+    -----------------
+    data : np.ndarray (5-dimensional)
+        data to save 
+    output: str
+        directory to save images 
+    well : str
+        name of well on 384-well plate 
+    format : str 
+        tiff or zarr 
+    """
+    
+    assert format in {"tiff", "zarr"}, "Only tiff and zarr writing supported"
+    output = os.path.expanduser(output)
+    if format == "zarr":
+        with open_ome_zarr(
+            store_path=output,
+            layout='hcs',
+            mode='a'
+        ) as dataset:
+            row = well[0]
+            col = well[1:]
+            position = dataset.create_position(row, col, "0")
+            img = position.create_zeros(
+                name="0", 
+                shape=data.shape, 
+                dtype=data.dtype
+                )
+            img[:] = copy.deepcopy(data)
+    elif format == "tiff":
+        if not os.path.isdir(output):
+            os.mkdir(output)
+        tifffile.imwrite(os.path.join(output, well+".tiff"), data)
+
+def get_wellname_from_imagepath(image_path):
+    pattern = r'\.tif'
+    match = re.search(pattern, image_path)
+    if match is None:
+        pattern = r'[A-P]\/\d{1,2}'
+        match = re.search(pattern, image_path)
+        assert match is not None, "Well name not found in file name"
+        [row, col] = match.group().split("/")
+        return row + col
+    
+    return image_path[match.start() - 3: match.start()]
+
+def write_to_csv(data, save_path):
+    with open(save_path, mode='w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        for row in data:
+            writer.writerow(row)
