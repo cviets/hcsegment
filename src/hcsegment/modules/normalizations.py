@@ -16,6 +16,9 @@ def minmax(inp):
 
     new_range = max_new - min_new
 
+    if original_range == 0:
+        return inp
+
     return ((inp - original_min) / original_range) * new_range + min_new
 
 def minmax_percentile(inp, pmin=2, pmax=98):
