@@ -9,5 +9,11 @@ Requires-Python: >=3.6
 Description-Content-Type: text/markdown
 Requires-Dist: numpy
 Requires-Dist: iohub
+Requires-Dist: careamics@ git+https://github.com/cviets/careamics.git@main
+Requires-Dist: tifffile
+Requires-Dist: torch
+Requires-Dist: scipy
+Requires-Dist: skimage
+Requires-Dist: matplotlib
 
 <h2 align="center">HCSegment</h2>

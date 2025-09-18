@@ -2,11 +2,9 @@ import numpy as np
 
 def minmax(inp):
 
-    if inp.ndim == 3:
+    if inp.ndim > 2:
         return np.array([minmax(elt) for elt in inp])
-    else:
-        assert inp.ndim == 2
-
+    
     min_new = -1
     max_new = 1
 
@@ -23,10 +21,8 @@ def minmax(inp):
 
 def minmax_percentile(inp, pmin=2, pmax=98):
 
-    if inp.ndim == 3:
-        return np.array([minmax_percentile(elt) for elt in inp])
-    else:
-        assert inp.ndim == 2
+    if inp.ndim > 2:
+        return np.array([minmax_percentile(elt, pmin, pmax) for elt in inp])
 
     min_val = np.percentile(inp, pmin)
     max_val = np.percentile(inp, pmax)

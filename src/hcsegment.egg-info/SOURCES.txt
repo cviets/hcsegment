@@ -3,7 +3,8 @@ pyproject.toml
 src/hcsegment/__init__.py
 src/hcsegment/cli.py
 src/hcsegment/run_denoise.py
-src/hcsegment/run_to_zarr.py
+src/hcsegment/run_mask_nuclei.py
+src/hcsegment/run_stitch.py
 src/hcsegment.egg-info/PKG-INFO
 src/hcsegment.egg-info/SOURCES.txt
 src/hcsegment.egg-info/dependency_links.txt
@@ -13,7 +14,9 @@ src/hcsegment.egg-info/top_level.txt
 src/hcsegment/modules/denoise.py
 src/hcsegment/modules/image_stitch.py
 src/hcsegment/modules/io_utils.py
+src/hcsegment/modules/neurite_segment.py
 src/hcsegment/modules/normalizations.py
+src/hcsegment/modules/nuclei_segment.py
 tests/test_denoise.py
 tests/test_io_utils.py
 tests/test_to_zarr.py

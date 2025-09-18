@@ -6,7 +6,7 @@ from iohub.ngff import open_ome_zarr
 from glob import glob
 from .io_utils import get_positions, get_timepoint_dirs, convert_position_list, sort_files, get_grid_position
 from typing import List, Tuple
-from .normalizations import minmax
+from .normalizations import minmax, minmax_percentile
 
 def fill_in_image(
         img, 
@@ -73,7 +73,7 @@ def stitch(root_dir: str, store_path: str, format: str, rows: int, columns: int,
         with open_ome_zarr(
             store_path=store_path,
             layout='hcs',
-            mode='w',
+            mode='w-',
             channel_names=channel_names
         ) as dataset:
             for (row, col, fov) in tqdm(position_list_for_zarr, desc="Writing Zarrs"):
@@ -89,8 +89,18 @@ def stitch(root_dir: str, store_path: str, format: str, rows: int, columns: int,
                 cur_position = row + convert_to_str(col)
                 idx = position_list.index(cur_position)
 
-                
-                fill_in_image(img, files_all, idx, rows, columns, sites, len(timepoints), len(channels), (chunk_height, chunk_width))
+                fill_in_image(
+                    img, 
+                    files_all, 
+                    idx, 
+                    rows, 
+                    columns, 
+                    sites, 
+                    len(timepoints), 
+                    len(channels), 
+                    (chunk_height, chunk_width)
+                    )
+                img = minmax_percentile(img, 3, 97)
                 # idx_to_search = slice(idx*len(sites)*len(channels), (idx+1)*len(sites)*len(channels), 1)
                 # for i in range(len(timepoints)):
                 #     files_tp = files_all[i][idx_to_search]
@@ -103,5 +113,24 @@ def stitch(root_dir: str, store_path: str, format: str, rows: int, columns: int,
             dataset.print_tree()
     
     else:
+        store_path_ = os.path.expanduser(store_path)
+        if not os.path.isdir(store_path_):
+            os.mkdir(store_path_)
+        else:
+            raise FileExistsError("Output folder already exists")
         for idx, position in tqdm(enumerate(position_list), desc="Writing tiffs"):
-            idx_to_search = slice(idx*len(sites)*len(channels), (idx+1)*len(sites)*len(channels), 1)
+            img = np.zeros(shape=shape)
+            fill_in_image(
+                    img, 
+                    files_all, 
+                    idx, 
+                    rows, 
+                    columns, 
+                    sites, 
+                    len(timepoints), 
+                    len(channels), 
+                    (chunk_height, chunk_width)
+                    )
+            img = minmax_percentile(img, 3, 97)
+            output_path = os.path.join(store_path_, position+".tiff")
+            tifffile.imwrite(output_path, img)

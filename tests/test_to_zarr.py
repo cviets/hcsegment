@@ -1,7 +1,7 @@
-#%%
 import numpy as np
 from scipy import stats
 import zarr
+import matplotlib.pyplot as plt
 
 def compute_autocorrelation(img_window, vertical_lag=10, horizontal_lag=10):
 
@@ -17,4 +17,3 @@ def compute_autocorrelation(img_window, vertical_lag=10, horizontal_lag=10):
             output[vlag, hlag] = stats.pearsonr(cur_values, offsets)[0]
     return output
 
-#%%

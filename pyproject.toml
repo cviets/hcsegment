@@ -13,7 +13,13 @@ authors = [
 ]
 dependencies = [
     "numpy",
-    "iohub"
+    "iohub",
+    "careamics @ git+https://github.com/cviets/careamics.git@main",
+    "tifffile", 
+    "torch",
+    "scipy",
+    "scikit-image",
+    "matplotlib"
 ]
 
 [project.urls]
