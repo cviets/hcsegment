@@ -4,5 +4,5 @@ careamics@ git+https://github.com/cviets/careamics.git@main
 tifffile
 torch
 scipy
-skimage
+scikit-image
 matplotlib
