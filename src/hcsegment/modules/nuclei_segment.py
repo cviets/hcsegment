@@ -6,7 +6,7 @@ from skimage import morphology
 from numpy.typing import NDArray
 from typing import Union
 import copy
-from .io_utils import get_files_in_path, save_tiff, read_image, write_image, get_wellname_from_imagepath, write_to_csv
+from .io_utils import get_files_in_path, read_image, write_image, get_wellname_from_imagepath, write_to_csv
 from tqdm import tqdm
 
 def local_maxima(
@@ -54,17 +54,17 @@ def filter_by_size(img: Union[NDArray[np.bool_], NDArray[np.int32]], min_size: U
     return out
 
 def instance_segment(
-        denoised_image: NDArray[np.float64], 
+        img: NDArray[np.float64], 
         min_dist_btwn_cells: int=20, 
         min_object_size: int=80,
         max_object_size: int=2000
         ) -> NDArray[np.int32]:
     
-    if denoised_image.ndim > 2:
-        return np.array([instance_segment(elt) for elt in denoised_image])
+    if img.ndim > 2:
+        return np.array([instance_segment(elt) for elt in img])
     
-    working_img = minmax(denoised_image)
-    working_img_seg = minmax_percentile(denoised_image, 3, 97)
+    working_img = minmax(img)
+    working_img_seg = minmax_percentile(img, 3, 97)
     semantic_segmentation_orig = semantic_segment(working_img_seg, min_object_size, max_object_size)
     semantic_segmentation = filter_by_size(semantic_segmentation_orig, min_object_size, max_object_size)
     semantic_segmentation = binary_dilation(semantic_segmentation)
@@ -116,7 +116,7 @@ def instance_segment_path(
     example_image = read_image(images[0], format)
 
     if save_results:
-        results_table = np.zeros((1+example_image.shape[0], len(images)), dtype=str)
+        results_table = np.zeros((len(images), 1+example_image.shape[0]), dtype=str)
 
     for i, image_path in enumerate(tqdm(images, desc="Nuclear masks")):
         wellname = get_wellname_from_imagepath(image_path)
@@ -134,8 +134,8 @@ def instance_segment_path(
 
         if save_results:
             num_cells = np.array([str(len(np.unique(elt)) - 1) for elt in segmentation])
-            results_table[0,i] = wellname
-            results_table[1:,i] = num_cells
+            results_table[i,0] = wellname
+            results_table[i,1:] = num_cells
 
         segmentation = np.expand_dims(segmentation, 1)
         segmentation = np.expand_dims(segmentation, 2)
@@ -143,5 +143,5 @@ def instance_segment_path(
         write_image(segmentation, output, wellname, format)
 
     if save_results:
-        results_table = np.vstack((["Well", ""], results_table))
+        results_table = np.vstack((["Well"] + ["Counts_"+str(elt+1) for elt in range(example_image.shape[0])], results_table))
         write_to_csv(results_table, output+"_DATA.csv")

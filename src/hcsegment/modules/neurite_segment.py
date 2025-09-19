@@ -1,16 +1,13 @@
-#%%
 import numpy as np
-from src.hcsegment.modules.normalizations import minmax_percentile
-from src.hcsegment.modules.nuclei_segment import instance_segment
+from .normalizations import minmax_percentile
+from .nuclei_segment import instance_segment
+from .io_utils import get_files_in_path, read_image, get_wellname_from_imagepath, write_image, write_to_csv
 from scipy.ndimage import binary_dilation
-from typing import Tuple, List, Union
+from typing import Tuple, List
 from tqdm import tqdm
-import mwatershed
-import matplotlib.pyplot as plt
 from skimage.morphology import skeletonize
 import copy
-from skimage.measure import label, regionprops, regionprops_table
-from scipy.ndimage import binary_opening, binary_dilation, binary_erosion, distance_transform_edt
+from scipy.ndimage import binary_dilation, distance_transform_edt
 from skimage.morphology import diamond, disk, remove_small_objects
 
 def keep_near_skeleton(binary_img, dist=3):
@@ -46,61 +43,11 @@ def grow_skeletons(skeleton, structure=diamond(radius=1), iterations=10):
     elif iterations > 1:
         return grow_skeletons(new_skeleton, structure, iterations-1)
 
-def compute_affinities(seg: np.ndarray, nhood: list):
-    nhood = np.array(nhood)
-
-    shape = seg.shape
-    n_edges = nhood.shape[0]
-    affinity = np.zeros((n_edges,) + shape, dtype=np.int32)
-
-    for e in range(n_edges):
-        affinity[
-            e,
-            max(0, -nhood[e, 0]) : min(shape[0], shape[0] - nhood[e, 0]),
-            max(0, -nhood[e, 1]) : min(shape[1], shape[1] - nhood[e, 1]),
-        ] = (
-            np.isclose(
-                seg[
-                    max(0, nhood[e, 0]) : min(shape[0], shape[0] + nhood[e, 0]),
-                    max(0, nhood[e, 1]) : min(shape[1], shape[1] + nhood[e, 1]),
-                ],
-                seg[
-                    max(0, -nhood[e, 0]) : min(shape[0], shape[0] - nhood[e, 0]),
-                    max(0, -nhood[e, 1]) : min(shape[1], shape[1] - nhood[e, 1]),
-                ],
-                rtol=0 if type(seg[0,0]) == np.bool_ else 1, 
-                atol=0 if type(seg[0,0]) == np.bool_ else -0.4
-            )
-            * (
-                seg[
-                    max(0, -nhood[e, 0]) : min(shape[0], shape[0] - nhood[e, 0]),
-                    max(0, -nhood[e, 1]) : min(shape[1], shape[1] - nhood[e, 1]),
-                ]
-                > 0
-            )
-            * (
-                seg[
-                    max(0, nhood[e, 0]) : min(shape[0], shape[0] + nhood[e, 0]),
-                    max(0, nhood[e, 1]) : min(shape[1], shape[1] + nhood[e, 1]),
-                ]
-                > 0
-            )
-        )
-
-    return affinity
-
 def binarize_by_std(img_window: np.ndarray[np.float64], stds: int) -> np.ndarray[np.bool_]:
     mu = np.mean(img_window[img_window >= -1])
     std = np.std(img_window[img_window >= -1])
 
     return img_window > mu+std*stds
-
-def segment(img_window: Union[np.ndarray[np.float64], np.ndarray[np.bool_]], offsets) -> np.ndarray[np.int32]:
-    if type(img_window[0,0]) == np.float64:
-        working_img = minmax_percentile(img_window, 3, 97)
-    else:
-        working_img = copy.deepcopy(img_window)
-    return compute_affinities(working_img, offsets)
 
 def get_slices(length: int, window: int, stride: int) -> List[slice]: 
     out = [slice(stride*i, window+stride*i, 1) for i in range((length-window)//stride + 1)]
@@ -112,103 +59,129 @@ def get_slices(length: int, window: int, stride: int) -> List[slice]:
 def sliding_window_segment(
         img: np.ndarray[np.float64], 
         shape: Tuple[int, int], 
-        strides: Tuple[int, int],
-        offsets: List[List[int]]
+        strides: Tuple[int, int]
         ):
     
-    # affinities = np.zeros(shape=(len(offsets), img.shape[0], img.shape[1]))
-    # skeletons = np.zeros_like(affinities)
     binaries = np.zeros_like(img)
     counts = np.zeros_like(img)
 
     yslices = get_slices(img.shape[0], shape[0], strides[0])
     xslices = get_slices(img.shape[1], shape[1], strides[1])
 
-    for yslice in tqdm(yslices):
+    for yslice in yslices:
         for xslice in xslices:
             img_window = minmax_percentile(img[yslice, xslice], 3, 97)
-            # cell_indices = np.nonzero(sem_seg[yslice, xslice])
-
-            # mu = np.mean(img_window[img_window >= -1])
-            # stdev = np.std(img_window[img_window >= -1])
-
-            # # fill holes with Gaussian noise so affinities can't pick up on them
-            # for i in range(len(cell_indices[0])):
-            #     idx_y = cell_indices[0][i]
-            #     idx_x = cell_indices[1][i]
-            #     img_window[idx_y, idx_x] = np.clip(np.random.normal(mu, stdev), -1, 1)
-            
-            window_binary = binarize_by_std(img_window, 1.25)
-            # window_affinities = segment(window_binary, offsets)
-            
-            # skeletons[:,yslice,xslice] += np.array([skeletonize(elt) for elt in window_affinities])
-            # affinities[:,yslice,xslice] += window_affinities
+            window_binary = binarize_by_std(img_window, 1)
             binaries[yslice, xslice] += window_binary
             counts[yslice, xslice] += 1
 
     assert np.all(counts != 0)
-    binaries /= counts
-    counts = np.array([counts]*len(offsets))
+    return binaries / counts
 
-    # return (affinities/counts, skeletons/counts, binaries)
-    return binaries
+def neurite_segment(
+        img: np.ndarray[np.float64]
+        ) -> np.ndarray[np.bool_]:
+    """
+    Get neurite segmentation of input 2D image
 
-#%%
+    Parameters
+    ------------
+    img : np.ndarray[np.float64]
+        Input image containing nucleus and cytoplasmic information
 
-denoised_image = np.load("/Users/chrisviets/Desktop/denoised.npy")
-inst_seg = instance_segment(denoised_image, 10, 50, max_object_size=None)
-sem_seg = binary_dilation(inst_seg>0, structure=np.ones((3,3)), iterations=4)
-cell_indices = np.nonzero(sem_seg)
+    Returns 
+    ---------
+    mask : np.ndarray[bool_]
+        Binary image showing where neurites appear
+    """
 
-denoised_image_cutout = minmax_percentile(denoised_image, 3, 97)
-denoised_image_cutout[sem_seg] = -1.1
-mu = np.mean(denoised_image_cutout[denoised_image_cutout >= -1])
-stdev = np.std(denoised_image_cutout[denoised_image_cutout >= -1])
+    # get segmentation of nuclei and larger debris to ignore it
+    if img.ndim > 2:
+        return np.array([neurite_segment(elt) for elt in img])
 
-# fill holes with Gaussian noise so affinities can't pick up on them
-for i in range(len(cell_indices[0])):
-    idx_y = cell_indices[0][i]
-    idx_x = cell_indices[1][i]
-    denoised_image_cutout[idx_y, idx_x] = np.clip(np.random.normal(mu, stdev), -1, 1)
-np.save("/Users/chrisviets/Desktop/denoised_image_cutout.npy", denoised_image_cutout)
-# %%
-offsets = [
-    [1, 0],
-    [0, 1],
-    [2, 0],
-    [0, 2],
-    [5, 0],
-    [0, 5]
-]
+    inst_seg = instance_segment(img, 10, 50, max_object_size=None)
+    sem_seg = binary_dilation(inst_seg>0, structure=np.ones((3,3)), iterations=4)
+    cell_indices = np.nonzero(sem_seg)
 
-binaries = sliding_window_segment(denoised_image_cutout, (50, 50), (10, 10), offsets)
-# np.save("/Users/chrisviets/Desktop/affinities.npy", affinities)
-# np.save("/Users/chrisviets/Desktop/skeletons.npy", skeletons)
-np.save("/Users/chrisviets/Desktop/binaries.npy", binaries)
+    img_cutout = minmax_percentile(img, 3, 97)
+    img_cutout[sem_seg] = -1.1
+    mu = np.mean(img_cutout[img_cutout >= -1])
+    stdev = np.std(img_cutout[img_cutout >= -1])
 
-# %%
+    # fill holes with Gaussian noise 
+    for i in range(len(cell_indices[0])):
+        idx_y = cell_indices[0][i]
+        idx_x = cell_indices[1][i]
+        img_cutout[idx_y, idx_x] = np.clip(np.random.normal(mu, stdev), -1, 1)
 
-# components = mwatershed.agglom(affinities,offsets)
-# plt.imshow(components)
-# np.save("/Users/chrisviets/Desktop/components.npy", components>0)
-# %%
+    # segment by sliding window approach
+    binaries = sliding_window_segment(
+        img_cutout, 
+        (img.shape[0]//20, img.shape[1]//20), 
+        (img.shape[0]//40, img.shape[1]//40)
+        )
+    binary = binaries > 2/3
+    binary[sem_seg] = False
+    binary = remove_nucleus_borders(binary, sem_seg, 10)
 
-binary = binaries > 0.9
-binary[sem_seg] = False
-binary = remove_nucleus_borders(binary, sem_seg, 10)
-# binary = binary_opening(binary, structure=diamond(radius=1))
-np.save("/Users/chrisviets/Desktop/binary.npy", binary)
-skeleton = skeletonize(binary)
-skeleton = remove_small_objects(skeleton, min_size=6, connectivity=2)
-np.save("/Users/chrisviets/Desktop/skeleton.npy", skeleton)
+    # skeletonize the mask and connect nearby skeletons to each other
+    skeleton = skeletonize(binary)
+    skeleton = remove_small_objects(skeleton, min_size=20, connectivity=2)
+    grow_skels = grow_skeletons(skeleton, disk(radius=2), 4)
 
-# %%
-grow_skels = grow_skeletons(skeleton, disk(radius=2), 3)
-np.save("/Users/chrisviets/Desktop/grow_skels.npy", grow_skels)
-# %%
-out = remove_small_objects(grow_skels, min_size=32, connectivity=2)
-out = binary_dilation(out, np.ones((3,3)))
-np.save("/Users/chrisviets/Desktop/out.npy", out)
+    # remove small skeletons and get the final result
+    mask = remove_small_objects(grow_skels, min_size=32, connectivity=2)
+    mask = binary_dilation(mask, np.ones((3,3)))
+    return mask
 
+def neurite_segment_path(input: str, output: str, cyto_channel: int, save_results: bool=True) -> None:
+    """
+    Generate neurite segmentations for all images in input path 
 
-# %%
+    Parameters
+    -----------
+    input : str
+        Path to directory containing images
+    output : str
+        Path to directory to save neurite masks
+    cyto_channel : int
+        Channel number containing cytoplasmic marker (0-indexed)
+    save_results : bool
+        Whether to save neurite area data as a CSV file
+    """
+    if output == "" or output is None:
+        output = input + "_neurite_masks"
+
+    images, format = get_files_in_path(input)
+    example_image = read_image(images[0], format)
+
+    if save_results:
+        results_table = np.zeros((len(images), 1+example_image.shape[0]), dtype=str)
+    
+    for i, image_path in enumerate(tqdm(images, desc="Neurite masks")):
+        wellname = get_wellname_from_imagepath(image_path)
+        image = read_image(image_path, format)
+        assert image.ndim == 5, "Saved images must be 5-dimensional (TCZYX)"
+        assert image.shape[2] == 1, ("Currently only supports images with one z-slice", image.shape)
+        
+        image = np.squeeze(image[:,cyto_channel,:,:,:])
+        segmentation = neurite_segment(image)
+
+        assert segmentation.ndim <= 3
+        if segmentation.ndim == 2:
+            # add empty time dimension if needed
+            np.expand_dims(segmentation, 0)
+
+        if save_results:
+            num_cells = np.array([str(np.sum(elt)) for elt in segmentation])
+            results_table[i,0] = wellname
+            results_table[i,1:] = num_cells
+
+        segmentation = np.expand_dims(segmentation, 1)
+        segmentation = np.expand_dims(segmentation, 2)
+
+        write_image(segmentation, output, wellname, format)
+
+    if save_results:
+        results_table = np.vstack((["Well"] + ["Counts_"+str(elt+1) for elt in range(example_image.shape[0])], results_table))
+        write_to_csv(results_table, output+"_DATA.csv")

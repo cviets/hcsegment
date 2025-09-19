@@ -19,4 +19,5 @@ src/hcsegment/modules/normalizations.py
 src/hcsegment/modules/nuclei_segment.py
 tests/test_denoise.py
 tests/test_io_utils.py
+tests/test_normalizations.py
 tests/test_to_zarr.py

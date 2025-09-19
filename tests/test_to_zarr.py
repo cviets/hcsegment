@@ -1,7 +1,5 @@
 import numpy as np
 from scipy import stats
-import zarr
-import matplotlib.pyplot as plt
 
 def compute_autocorrelation(img_window, vertical_lag=10, horizontal_lag=10):
 
