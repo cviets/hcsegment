@@ -116,7 +116,7 @@ def instance_segment_path(
     example_image = read_image(images[0], format)
 
     if save_results:
-        results_table = np.zeros((len(images), 1+example_image.shape[0]), dtype=str)
+        results_table = np.zeros((len(images), 1+example_image.shape[0]), dtype=object)
 
     for i, image_path in enumerate(tqdm(images, desc="Nuclear masks")):
         wellname = get_wellname_from_imagepath(image_path)
