@@ -1,8 +1,6 @@
 numpy
 iohub
-careamics@ git+https://github.com/cviets/careamics.git@main
 tifffile
-torch
 scipy
 scikit-image
 matplotlib

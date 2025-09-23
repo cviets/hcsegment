@@ -3,6 +3,7 @@ pyproject.toml
 src/hcsegment/__init__.py
 src/hcsegment/cli.py
 src/hcsegment/run_denoise.py
+src/hcsegment/run_mask_neurites.py
 src/hcsegment/run_mask_nuclei.py
 src/hcsegment/run_stitch.py
 src/hcsegment.egg-info/PKG-INFO

@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: hcsegment
-Version: 0.0.1
+Version: 0.0.2
 Summary: Cell segmentation from HCS images
 Author: Chris Viets
 Project-URL: Homepage, https://github.com/cviets/hcsegment
@@ -9,11 +9,9 @@ Requires-Python: >=3.6
 Description-Content-Type: text/markdown
 Requires-Dist: numpy
 Requires-Dist: iohub
-Requires-Dist: careamics@ git+https://github.com/cviets/careamics.git@main
 Requires-Dist: tifffile
-Requires-Dist: torch
 Requires-Dist: scipy
 Requires-Dist: scikit-image
 Requires-Dist: matplotlib
 
-<h2 align="center">HCSegment</h2>
+<h1 align="center">HCSegment</h1>

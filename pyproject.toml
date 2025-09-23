@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hcsegment"
-version = "0.0.1"
+version = "0.0.2"
 description = "Cell segmentation from HCS images"
 readme = "README.md"
 requires-python = ">=3.6"
@@ -14,9 +14,9 @@ authors = [
 dependencies = [
     "numpy",
     "iohub",
-    "careamics @ git+https://github.com/cviets/careamics.git@main",
+    # "careamics @ git+https://github.com/cviets/careamics.git@main",
     "tifffile", 
-    "torch",
+    # "torch",
     "scipy",
     "scikit-image",
     "matplotlib"
