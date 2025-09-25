@@ -27,8 +27,9 @@ def get_positions(file_list: List[str]) -> Tuple[List[str], int, int]:
 
         if search_for_channels:
             if file[match.end():match.end()+2] == "_w":
-                pattern_with_well = r'[A-P][0-1][0-9]_s\d+_w\d+'
+                pattern_with_well = r'[A-P][0-2][0-9]_s\d+_w\d+'
                 match_with_well = re.search(pattern_with_well, file)
+                assert match_with_well is not None, file
                 [_, _, channel_name] = match_with_well.group().split("_")
                 channels = channels.union({channel_name[1:2]})
             else:
