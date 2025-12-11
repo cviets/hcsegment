@@ -2,3 +2,5 @@
 csv_logs
 checkpoints
 tb_logs
+venv
+*.pyc
