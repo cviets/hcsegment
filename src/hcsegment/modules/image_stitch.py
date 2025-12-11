@@ -4,7 +4,7 @@ import tifffile
 import os
 from iohub.ngff import open_ome_zarr
 from glob import glob
-from .io_utils import get_positions, get_timepoint_dirs, convert_position_list, sort_files, get_grid_position
+from .io_utils import get_positions, get_timepoint_dirs, convert_position_list, sort_files, get_grid_position, get_stitched_images, remove_already_stitched
 from typing import List, Tuple
 from .normalizations import minmax, minmax_percentile
 
@@ -43,7 +43,7 @@ def stitch(root_dir: str, store_path: str, format: str, rows: int, columns: int,
 
     Parameters:
         root_dir: parent directory containing TIFF files within its sub-directories
-        store_path: path to save OME-Zarr files
+        store_path: path to save stitched images
         rows: number of rows imaged per well
         columns: number of columns imaged per well
         channel_names: names of the color channels imaged
@@ -56,10 +56,13 @@ def stitch(root_dir: str, store_path: str, format: str, rows: int, columns: int,
     assert format in {"tiff", "zarr"}, "Only tiff and zarr formats supported"
     
     timepoints = get_timepoint_dirs(root_dir)
+    stitched_images = get_stitched_images(store_path)
 
     # get shape of each image chunk
     example_imgs_list = glob(os.path.join(timepoints[0], "*.tif"))
     position_list, sites, channels = get_positions(example_imgs_list)
+    position_list = remove_already_stitched(position_list, stitched_images)
+
     assert len(channels) == len(channel_names), "Number of channels must match number of wavelengths imaged"
     assert len(sites) == rows*columns, f"Number of sites ({len(sites)}) does not equal rows*columns ({rows*columns})"
 
@@ -118,7 +121,7 @@ def stitch(root_dir: str, store_path: str, format: str, rows: int, columns: int,
             os.mkdir(store_path_)
         else:
             raise FileExistsError("Output folder already exists")
-        for idx, position in tqdm(enumerate(position_list), desc="Writing tiffs"):
+        for idx, position in enumerate(tqdm(position_list, desc="Writing tiffs")):
             img = np.zeros(shape=shape)
             fill_in_image(
                     img, 

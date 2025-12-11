@@ -163,6 +163,17 @@ def get_files_in_path(inp_path: str) -> Tuple[List[str], str]:
     else: 
         return tiffs, "tiff"
     
+def get_stitched_images(path_to_stitched_images: str) -> List[str]:
+    path_to_stitched_images = os.path.expanduser(path_to_stitched_images)
+    if not os.path.isdir(path_to_stitched_images):
+        return []
+    files, _ = get_files_in_path(path_to_stitched_images)
+    return files
+
+def remove_already_stitched(well_list, stitched_ims) -> List[str]:
+    stitched_wells = [os.path.splitext(elt)[0] for elt in stitched_ims]
+    return list(set(well_list) - set(stitched_wells))
+    
 def save_tiff(data, filename):
     tifffile.imwrite(filename, data)
 
