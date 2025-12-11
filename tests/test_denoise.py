@@ -23,6 +23,3 @@ for ax in axs:
     ax.set_axis_off()
 
 print(np.min(denoised), np.max(denoised))
-# %%
-zarr.open("/Volumes/Chris2/Exp001E/HCS_zarr.zarr")
-# %%
