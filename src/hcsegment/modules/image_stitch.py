@@ -119,8 +119,6 @@ def stitch(root_dir: str, store_path: str, format: str, rows: int, columns: int,
         store_path_ = os.path.expanduser(store_path)
         if not os.path.isdir(store_path_):
             os.mkdir(store_path_)
-        else:
-            raise FileExistsError("Output folder already exists")
         for idx, position in enumerate(tqdm(position_list, desc="Writing tiffs")):
             img = np.zeros(shape=shape)
             fill_in_image(
