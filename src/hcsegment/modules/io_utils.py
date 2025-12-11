@@ -172,6 +172,7 @@ def get_stitched_images(path_to_stitched_images: str) -> List[str]:
 
 def remove_already_stitched(well_list, stitched_ims) -> List[str]:
     stitched_wells = [os.path.splitext(elt)[0] for elt in stitched_ims]
+    stitched_wells = [os.path.basename(elt) for elt in stitched_wells]
     return list(set(well_list) - set(stitched_wells))
     
 def save_tiff(data, filename):

@@ -4,3 +4,4 @@ checkpoints
 tb_logs
 venv
 *.pyc
+.venv
