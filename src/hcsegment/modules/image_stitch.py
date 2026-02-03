@@ -34,7 +34,10 @@ def fill_in_image(
             yslice = slice(grid[0]*chunk_height, (grid[0]+1)*chunk_height, 1)
             xslice = slice(grid[1]*chunk_width, (grid[1]+1)*chunk_width, 1)
             for j in range(num_channels):
-                img[i,j,0,yslice,xslice] = tifffile.imread(files_tp[k*num_channels+j])
+                try:
+                    img[i,j,0,yslice,xslice] = tifffile.imread(files_tp[k*num_channels+j])
+                except:
+                    raise OSError(f"Failed to open {files_tp[k*num_channels+j]}")
 
 def stitch(root_dir: str, store_path: str, format: str, rows: int, columns: int, channel_names: List[str]) -> None:
     """
