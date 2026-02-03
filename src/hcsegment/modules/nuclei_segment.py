@@ -6,7 +6,7 @@ from skimage import morphology
 from numpy.typing import NDArray
 from typing import Union
 import copy
-from .io_utils import get_files_in_path, read_image, write_image, get_wellname_from_imagepath, write_to_csv, get_basename, remove_completed_masks
+from .io_utils import get_files_in_path, read_image, write_image, get_wellname_from_imagepath, write_to_csv, get_basename, remove_completed_wells
 from tqdm import tqdm
 
 def local_maxima(
@@ -117,7 +117,7 @@ def instance_segment_path(
 
     completed_masks, _ = get_files_in_path(output)
     completed_wells = get_basename(completed_masks)
-    images = remove_completed_masks(images, completed_wells, input)
+    images = remove_completed_wells(images, completed_wells, input)
 
     if save_results:
         results_table = np.zeros((len(images), 1+example_image.shape[0]), dtype=object)

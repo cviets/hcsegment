@@ -1,4 +1,5 @@
 from typing import List, Tuple
+from collections.abc import Iterable
 import re
 import os
 from glob import glob 
@@ -171,7 +172,7 @@ def get_stitched_images(path_to_stitched_images: str) -> List[str]:
     files, _ = get_files_in_path(path_to_stitched_images)
     return files
 
-def get_basename(filenames):
+def get_basename(filenames: Iterable[str]) -> List[str]:
     return [os.path.basename(elt) for elt in filenames]
 
 def remove_already_stitched(well_list, stitched_ims) -> List[str]:
