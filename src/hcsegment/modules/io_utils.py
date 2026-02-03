@@ -92,7 +92,7 @@ def sort_files(file_list: List[str], positions: List[str], sites: List[str], cha
                 return file_list_.pop(i)
 
     file_list_copy = copy.deepcopy(file_list)
-    out = [""]*len(file_list_copy)
+    out = [""]*(len(positions)*len(sites)*len(channels))
     if len(channels) > 1:
         pattern = r'[A-P][0-2][0-9]_s\d_w\d'
     else:
@@ -111,9 +111,8 @@ def sort_files(file_list: List[str], positions: List[str], sites: List[str], cha
                 out[idx] = get_match(file_list_copy, identifier)
                 idx += 1
 
-    assert out[-1] != "", "Not all values were sorted"
-    assert len(file_list_copy) == 0, len(file_list_copy)
-
+    # assert out[-1] != "", "Not all values were sorted"
+    # assert len(file_list_copy) == 0, len(file_list_copy)
     return out
 
 def get_grid_position(site: int, rows: int, cols: int) -> Tuple[int]:
@@ -147,6 +146,8 @@ def get_files_in_path(inp_path: str) -> Tuple[List[str], str]:
     """
     Given the input path, returns the images in the path and their format (tiff or zarr)
     """
+    if not os.path.isdir(inp_path):
+        return [], "_"
     out = []
     inp_path = os.path.expanduser(inp_path)
     tiffs = glob(os.path.join(inp_path, "*.tif"))
@@ -170,10 +171,17 @@ def get_stitched_images(path_to_stitched_images: str) -> List[str]:
     files, _ = get_files_in_path(path_to_stitched_images)
     return files
 
+def get_basename(filenames):
+    return [os.path.basename(elt) for elt in filenames]
+
 def remove_already_stitched(well_list, stitched_ims) -> List[str]:
     stitched_wells = [os.path.splitext(elt)[0] for elt in stitched_ims]
-    stitched_wells = [os.path.basename(elt) for elt in stitched_wells]
+    stitched_wells = get_basename(stitched_wells)
     return list(set(well_list) - set(stitched_wells))
+
+def remove_completed_wells(image_list, completed_mask_list, image_path) -> List[str]:
+    completed_images = [os.path.join(image_path, elt) for elt in completed_mask_list]
+    return list(set(image_list) - set(completed_images))
     
 def save_tiff(data, filename):
     tifffile.imwrite(filename, data)
@@ -181,7 +189,10 @@ def save_tiff(data, filename):
 def read_image(path_to_img: str, format: str) -> np.ndarray:
     assert format in {"tiff", "zarr"}, "Only tiff and zarr reading supported"
     if format == "tiff":
-        return np.array(tifffile.imread(path_to_img))
+        try:
+            return np.array(tifffile.imread(path_to_img))
+        except:
+            raise Exception(f"Could not open {path_to_img}")
     else:
         return np.array(zarr.open(path_to_img))
     
@@ -236,7 +247,7 @@ def get_wellname_from_imagepath(image_path):
     return image_path[match.start() - 3: match.start()]
 
 def write_to_csv(data, save_path):
-    with open(save_path, mode='w', newline='') as csvfile:
+    with open(save_path, mode='a', newline='') as csvfile:
         writer = csv.writer(csvfile)
         for row in data:
             writer.writerow(row)

@@ -6,7 +6,7 @@ from skimage import morphology
 from numpy.typing import NDArray
 from typing import Union
 import copy
-from .io_utils import get_files_in_path, read_image, write_image, get_wellname_from_imagepath, write_to_csv
+from .io_utils import get_files_in_path, read_image, write_image, get_wellname_from_imagepath, write_to_csv, get_basename, remove_completed_masks
 from tqdm import tqdm
 
 def local_maxima(
@@ -115,12 +115,22 @@ def instance_segment_path(
     images, format = get_files_in_path(input)
     example_image = read_image(images[0], format)
 
+    completed_masks, _ = get_files_in_path(output)
+    completed_wells = get_basename(completed_masks)
+    images = remove_completed_masks(images, completed_wells, input)
+
     if save_results:
         results_table = np.zeros((len(images), 1+example_image.shape[0]), dtype=object)
 
     for i, image_path in enumerate(tqdm(images, desc="Nuclear masks")):
         wellname = get_wellname_from_imagepath(image_path)
-        image = read_image(image_path, format)
+        try:
+            image = read_image(image_path, format)
+        except:
+            if save_results:
+                results_table = np.vstack((["Well"] + ["Counts_"+str(elt+1) for elt in range(example_image.shape[0])], results_table))
+                write_to_csv(results_table, output+"_DATA.csv")
+            raise
         assert image.ndim == 5, "Saved images must be 5-dimensional (TCZYX)"
         assert image.shape[2] == 1, ("Currently only supports images with one z-slice", image.shape)
         
