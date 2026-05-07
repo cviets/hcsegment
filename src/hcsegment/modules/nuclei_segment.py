@@ -1,6 +1,6 @@
 import numpy as np
 from .normalizations import minmax, minmax_percentile
-from scipy.ndimage import label, maximum_filter, binary_fill_holes, binary_opening, binary_dilation
+from scipy.ndimage import label, maximum_filter, binary_fill_holes, binary_opening, binary_dilation, gaussian_filter
 from skimage.segmentation import watershed
 from skimage import morphology
 from numpy.typing import NDArray
@@ -17,24 +17,54 @@ def local_maxima(
     maxima = max_filtered == image
     return maxima
 
+# def semantic_segment(
+#         image: NDArray[np.float64], 
+#         min_size: Union[int,None]=None, 
+#         max_size: Union[int,None]=None
+#         ) -> NDArray[np.bool_]:
+    
+#     maxima = local_maxima(image, 5)
+
+#     # remove large background and small objects
+#     maxima = filter_by_size(maxima, min_size, max_size)
+
+#     # fill donut-shaped objects
+#     out1 =  binary_opening(binary_fill_holes(maxima), structure=np.ones((3,3)))
+
+#     # make sure we don't pick up on dark structures
+#     out2 = image>np.percentile(image, 50)
+#     assert type(out1[0,0]) == np.bool_, type(out1[0,0])
+#     assert type(out2[0,0]) == np.bool_, type(out2[0,0])
+#     return out1 & out2
+
 def semantic_segment(
         image: NDArray[np.float64], 
         min_size: Union[int,None]=None, 
-        max_size: Union[int,None]=None
+        max_size: Union[int,None]=None,
+        averaging_factor: float=0.25,
+        percentile: int=50
         ) -> NDArray[np.bool_]:
-    
-    maxima = local_maxima(image)
+    max_filtered = maximum_filter(image, 5)
+    gauss_filtered = gaussian_filter(image, 10)
+
+    # we want to consider not just strict maxima, but also pixel values that are approximately equal to the max
+    # so, we take a Gaussian filter and consider "maxima" to be pixels that are closer to the max filter than to the Gaussian filter
+    # averaging factor in [0, 1], higher value = stricter cutoff
+    cutoff = averaging_factor*max_filtered + (1-averaging_factor)*gauss_filtered
+    maxima = image >= cutoff
 
     # remove large background and small objects
     maxima = filter_by_size(maxima, min_size, max_size)
 
     # fill donut-shaped objects
     out1 =  binary_opening(binary_fill_holes(maxima), structure=np.ones((3,3)))
+    out1 = filter_by_size(out1, min_size, max_size)
 
     # make sure we don't pick up on dark structures
-    out2 = image>np.percentile(image, 50)
+    out2 = image>np.percentile(image, percentile)
     assert type(out1[0,0]) == np.bool_, type(out1[0,0])
     assert type(out2[0,0]) == np.bool_, type(out2[0,0])
+
     return out1 & out2
 
 def filter_by_size(img: Union[NDArray[np.bool_], NDArray[np.int32]], min_size: Union[int, None], max_size: Union[int, None]) -> NDArray[np.bool_]:
@@ -57,15 +87,25 @@ def instance_segment(
         img: NDArray[np.float64], 
         min_dist_btwn_cells: int=20, 
         min_object_size: int=80,
-        max_object_size: int=2000
+        max_object_size: int=2000,
+        averaging_factor: float=0.25,
+        percentile: int=50
         ) -> NDArray[np.int32]:
     
     if img.ndim > 2:
-        return np.array([instance_segment(elt) for elt in img])
+        return np.array([
+            instance_segment(
+                elt, 
+                min_dist_btwn_cells, 
+                min_object_size,
+                max_object_size,
+                averaging_factor,
+                percentile
+                ) for elt in img])
     
     working_img = minmax(img)
     working_img_seg = minmax_percentile(img, 3, 97)
-    semantic_segmentation_orig = semantic_segment(working_img_seg, min_object_size, max_object_size)
+    semantic_segmentation_orig = semantic_segment(working_img_seg, min_object_size, max_object_size, averaging_factor, percentile)
     semantic_segmentation = filter_by_size(semantic_segmentation_orig, min_object_size, max_object_size)
     semantic_segmentation = binary_dilation(semantic_segmentation)
 
@@ -86,7 +126,9 @@ def instance_segment_path(
         min_dist: int, 
         min_size: int, 
         max_size: int, 
-        save_results: bool
+        save_results: bool,
+        threshold: float,
+        percentile: float
         ) -> None:
     """
     Create and save instance segmentations for all images in specified path
@@ -107,6 +149,10 @@ def instance_segment_path(
         Maximum size of objects to count
     save_results : bool
         Whether to save the cell counts in a CSV file
+    threshold : float
+        Averaging factor used to take weighted average of max filter and Gaussian filter
+    percentile : int
+        Pixels below this percentile will not be included in final mask
     """
 
     if output == "" or output is None:
@@ -135,12 +181,12 @@ def instance_segment_path(
         assert image.shape[2] == 1, ("Currently only supports images with one z-slice", image.shape)
         
         image = np.squeeze(image[:,nuclear_channel,:,:,:])
-        segmentation = instance_segment(image, min_dist, min_size, max_size)
+        segmentation = instance_segment(image, min_dist, min_size, max_size, threshold, percentile)
 
         assert segmentation.ndim <= 3
         if segmentation.ndim == 2:
             # add empty time dimension if needed
-            np.expand_dims(segmentation, 0)
+            segmentation = np.expand_dims(segmentation, 0)
 
         if save_results:
             num_cells = np.array([str(len(np.unique(elt)) - 1) for elt in segmentation])

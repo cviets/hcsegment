@@ -62,14 +62,21 @@ def stitch(root_dir: str, store_path: str, format: str, rows: int, columns: int,
     stitched_images = get_stitched_images(store_path)
 
     # get shape of each image chunk
-    example_imgs_list = glob(os.path.join(timepoints[0], "*.tif"))
-    position_list, sites, channels = get_positions(example_imgs_list)
+    for i, timepoint in enumerate(timepoints):
+        if i == 0:
+            imgs = set(glob(os.path.join(timepoints[0], "*.tif")))
+        else:
+            current_imgs = set(glob(os.path.join(timepoints[0], "*.tif")))
+            imgs = imgs.intersection(current_imgs)
+
+    imgs_list = list(imgs)
+    position_list, sites, channels = get_positions(imgs_list)
     position_list = remove_already_stitched(position_list, stitched_images)
 
     assert len(channels) == len(channel_names), "Number of channels must match number of wavelengths imaged"
     assert len(sites) == rows*columns, f"Number of sites ({len(sites)}) does not equal rows*columns ({rows*columns})"
 
-    example_img = tifffile.imread(example_imgs_list[0])
+    example_img = tifffile.imread(imgs_list[0])
     chunk_height, chunk_width = example_img.shape[0], example_img.shape[1]
     shape = (len(timepoints), len(channel_names), 1, chunk_height*rows, chunk_width*columns)
     files_all = np.array([sort_files(glob(os.path.join(tp_dir, "*.tif")), position_list, sites, channels) for tp_dir in timepoints])
