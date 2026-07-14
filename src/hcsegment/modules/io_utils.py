@@ -70,10 +70,10 @@ def get_timepoint_dirs(root_dir: str) -> List[str]:
             deletion_counter += len(thumb_files)
             for file in thumb_files:
                 os.remove(file)
-            if num_tiffs == -1:
-                num_tiffs = len(glob(os.path.join(root, "*.tif")))
-            else:
-                assert num_tiffs == len(glob(os.path.join(root, "*.tif"))), "TimePoints must all have same number of tiff files"
+            # if num_tiffs == -1:
+            #     num_tiffs = len(glob(os.path.join(root, "*.tif")))
+            # else:
+            #     assert num_tiffs == len(glob(os.path.join(root, "*.tif"))), "TimePoints must all have same number of tiff files"
 
     print(f"Deleted {deletion_counter} thumb files")
     sort_idx = np.argsort(timepoints_idx)

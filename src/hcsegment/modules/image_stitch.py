@@ -6,7 +6,7 @@ from iohub.ngff import open_ome_zarr
 from glob import glob
 from .io_utils import get_positions, get_timepoint_dirs, convert_position_list, sort_files, get_grid_position, get_stitched_images, remove_already_stitched
 from typing import List, Tuple
-from .normalizations import minmax, minmax_percentile
+from .normalizations import minmax_percentile
 
 def fill_in_image(
         img, 
@@ -39,9 +39,9 @@ def fill_in_image(
                 except:
                     raise OSError(f"Failed to open {files_tp[k*num_channels+j]}")
 
-def stitch(root_dir: str, store_path: str, format: str, rows: int, columns: int, channel_names: List[str]) -> None:
+def stitch(root_dir: str, store_path: str, rows: int, columns: int, wavelengths: int) -> None:
     """
-    Converts unstitched experiment TIFF files to OME-Zarr format. 
+    Converts unstitched experiment TIFF files to stitched TIFF files in TCZYX format. 
     TIFF files are expected to be in a folder named "TimePoint*" e.g., "TimePoint_1" 
 
     Parameters:
@@ -49,99 +49,48 @@ def stitch(root_dir: str, store_path: str, format: str, rows: int, columns: int,
         store_path: path to save stitched images
         rows: number of rows imaged per well
         columns: number of columns imaged per well
-        channel_names: names of the color channels imaged
+        wavelengths: number of wavelengths imaged
     """
-    format = format.lower()
-    if format == "tif":
-        format = "tiff"
-    elif format == "ome-zarr":
-        format = "zarr"
-    assert format in {"tiff", "zarr"}, "Only tiff and zarr formats supported"
     
     timepoints = get_timepoint_dirs(root_dir)
     stitched_images = get_stitched_images(store_path)
 
-    # get shape of each image chunk
+    # get list of all image names
     for i, timepoint in enumerate(timepoints):
         if i == 0:
             imgs = set(glob(os.path.join(timepoints[0], "*.tif")))
         else:
-            current_imgs = set(glob(os.path.join(timepoints[0], "*.tif")))
+            current_imgs = set(glob(os.path.join(timepoint, "*.tif")))
             imgs = imgs.intersection(current_imgs)
-
     imgs_list = list(imgs)
+
     position_list, sites, channels = get_positions(imgs_list)
     position_list = remove_already_stitched(position_list, stitched_images)
 
-    assert len(channels) == len(channel_names), "Number of channels must match number of wavelengths imaged"
-    assert len(sites) == rows*columns, f"Number of sites ({len(sites)}) does not equal rows*columns ({rows*columns})"
+    assert len(channels) == wavelengths, f"Number of wavelengths specified ({wavelengths}) does not match number of wavelengths in images ({len(channels)})"
+    assert len(sites) == rows*columns, f"Number of sites in images ({len(sites)}) does not equal specified rows*columns ({rows*columns})"
 
     example_img = tifffile.imread(imgs_list[0])
     chunk_height, chunk_width = example_img.shape[0], example_img.shape[1]
-    shape = (len(timepoints), len(channel_names), 1, chunk_height*rows, chunk_width*columns)
+    shape = (len(timepoints), wavelengths, 1, chunk_height*rows, chunk_width*columns)
     files_all = np.array([sort_files(glob(os.path.join(tp_dir, "*.tif")), position_list, sites, channels) for tp_dir in timepoints])
     
-    if format == "zarr":
-        position_list_for_zarr = convert_position_list(position_list)
-        with open_ome_zarr(
-            store_path=store_path,
-            layout='hcs',
-            mode='w-',
-            channel_names=channel_names
-        ) as dataset:
-            for (row, col, fov) in tqdm(position_list_for_zarr, desc="Writing Zarrs"):
-
-                position = dataset.create_position(row, col, fov)
-                img = position.create_zeros(
-                    name="0", 
-                    shape=shape, 
-                    dtype=np.uint16, 
-                    chunks=(1,1,1,chunk_height,chunk_width)
-                    )
-                convert_to_str = lambda x: x if int(x) >= 10 else "0"+x
-                cur_position = row + convert_to_str(col)
-                idx = position_list.index(cur_position)
-
-                fill_in_image(
-                    img, 
-                    files_all, 
-                    idx, 
-                    rows, 
-                    columns, 
-                    sites, 
-                    len(timepoints), 
-                    len(channels), 
-                    (chunk_height, chunk_width)
-                    )
-                img = minmax_percentile(img, 3, 97)
-                # idx_to_search = slice(idx*len(sites)*len(channels), (idx+1)*len(sites)*len(channels), 1)
-                # for i in range(len(timepoints)):
-                #     files_tp = files_all[i][idx_to_search]
-                #     for k, site in enumerate(sites):
-                #         grid = get_grid_position(int(site), rows, columns)
-                #         yslice = slice(grid[0]*chunk_height, (grid[0]+1)*chunk_height, 1)
-                #         xslice = slice(grid[1]*chunk_width, (grid[1]+1)*chunk_width, 1)
-                #         for j in range(len(channels)):
-                #             img[i,j,0,yslice,xslice] = tifffile.imread(files_tp[k*len(channels)+j])
-            dataset.print_tree()
-    
-    else:
-        store_path_ = os.path.expanduser(store_path)
-        if not os.path.isdir(store_path_):
-            os.mkdir(store_path_)
-        for idx, position in enumerate(tqdm(position_list, desc="Writing tiffs")):
-            img = np.zeros(shape=shape)
-            fill_in_image(
-                    img, 
-                    files_all, 
-                    idx, 
-                    rows, 
-                    columns, 
-                    sites, 
-                    len(timepoints), 
-                    len(channels), 
-                    (chunk_height, chunk_width)
-                    )
-            img = minmax_percentile(img, 3, 97)
-            output_path = os.path.join(store_path_, position+".tiff")
-            tifffile.imwrite(output_path, img)
+    store_path_ = os.path.expanduser(store_path)
+    if not os.path.isdir(store_path_):
+        os.mkdir(store_path_)
+    for idx, position in enumerate(tqdm(position_list, desc="Writing tiffs")):
+        img = np.zeros(shape=shape)
+        fill_in_image(
+                img, 
+                files_all, 
+                idx, 
+                rows, 
+                columns, 
+                sites, 
+                len(timepoints), 
+                len(channels), 
+                (chunk_height, chunk_width)
+                )
+        img = minmax_percentile(img, 3, 97)
+        output_path = os.path.join(store_path_, position+".tiff")
+        tifffile.imwrite(output_path, img)
