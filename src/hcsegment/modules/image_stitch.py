@@ -93,4 +93,5 @@ def stitch(root_dir: str, store_path: str, rows: int, columns: int, wavelengths:
                 )
         img = minmax_percentile(img, 3, 97)
         output_path = os.path.join(store_path_, position+".tiff")
+        img = img.astype(np.float32)
         tifffile.imwrite(output_path, img)
