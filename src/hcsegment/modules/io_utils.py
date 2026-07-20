@@ -7,8 +7,6 @@ import numpy as np
 from tqdm import tqdm
 import copy
 import tifffile
-import zarr
-from iohub.ngff import open_ome_zarr
 import csv
 
 def get_positions(file_list: List[str]) -> Tuple[List[str], int, int]:

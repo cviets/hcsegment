@@ -63,7 +63,7 @@ def stitch(root_dir: str, store_path: str, rows: int, columns: int, wavelengths:
             current_imgs = set(glob(os.path.join(timepoint, "*.tif")))
             imgs = imgs.intersection(current_imgs)
     imgs_list = list(imgs)
-
+    
     position_list, sites, channels = get_positions(imgs_list)
     position_list = remove_already_stitched(position_list, stitched_images)
 
