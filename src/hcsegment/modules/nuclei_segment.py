@@ -126,7 +126,7 @@ def instance_segment_path(
         min_dist: int, 
         min_size: int, 
         max_size: int, 
-        save_results: bool,
+        save_results: str,
         threshold: float,
         percentile: float
         ) -> None:
@@ -147,8 +147,8 @@ def instance_segment_path(
         Minimum size of objects to count
     max_size : int
         Maximum size of objects to count
-    save_results : bool
-        Whether to save the cell counts in a CSV file
+    save_results : str
+        Where to save the cell counts (path to a CSV file)
     threshold : float
         Averaging factor used to take weighted average of max filter and Gaussian filter
     percentile : int
@@ -158,27 +158,25 @@ def instance_segment_path(
     if output == "" or output is None:
         output = input + "_nuclear_masks"
 
-    images, format = get_files_in_path(input)
-    example_image = read_image(images[0], format)
+    images = get_files_in_path(input)
+    example_image = read_image(images[0])
 
-    completed_masks, _ = get_files_in_path(output)
+    completed_masks = get_files_in_path(output)
     completed_wells = get_basename(completed_masks)
     images = remove_completed_wells(images, completed_wells, input)
 
-    if save_results:
-        results_table = np.zeros((len(images), 1+example_image.shape[0]), dtype=object)
+    results_table = np.zeros((len(images), 1+example_image.shape[0]), dtype=object)
 
     for i, image_path in enumerate(tqdm(images, desc="Nuclear masks")):
         wellname = get_wellname_from_imagepath(image_path)
         try:
-            image = read_image(image_path, format)
+            image = read_image(image_path)
         except:
-            if save_results:
-                results_table = np.vstack((["Well"] + ["Counts_"+str(elt+1) for elt in range(example_image.shape[0])], results_table))
-                write_to_csv(results_table, output+"_DATA.csv")
-            raise
+            results_table = np.vstack((["Well"] + ["Counts_"+str(elt+1) for elt in range(example_image.shape[0])], results_table))
+            write_to_csv(results_table, output+"_DATA.csv")
+            raise OSError(f"Failed to read image from {image_path}")
         assert image.ndim == 5, "Saved images must be 5-dimensional (TCZYX)"
-        assert image.shape[2] == 1, ("Currently only supports images with one z-slice", image.shape)
+        assert image.shape[2] == 1, ("hcsegment currently only supports images with one z-slice", image.shape)
         
         image = np.squeeze(image[:,nuclear_channel,:,:,:])
         segmentation = instance_segment(image, min_dist, min_size, max_size, threshold, percentile)
@@ -188,16 +186,14 @@ def instance_segment_path(
             # add empty time dimension if needed
             segmentation = np.expand_dims(segmentation, 0)
 
-        if save_results:
-            num_cells = np.array([str(len(np.unique(elt)) - 1) for elt in segmentation])
-            results_table[i,0] = wellname
-            results_table[i,1:] = num_cells
+        num_cells = np.array([str(len(np.unique(elt)) - 1) for elt in segmentation])
+        results_table[i,0] = wellname
+        results_table[i,1:] = num_cells
 
         segmentation = np.expand_dims(segmentation, 1)
         segmentation = np.expand_dims(segmentation, 2)
 
-        write_image(segmentation, output, wellname, format)
+        write_image(segmentation, output, wellname)
 
-    if save_results:
-        results_table = np.vstack((["Well"] + ["Counts_"+str(elt+1) for elt in range(example_image.shape[0])], results_table))
-        write_to_csv(results_table, output+"_DATA.csv")
+    results_table = np.vstack((["Well"] + ["Counts_"+str(elt+1) for elt in range(example_image.shape[0])], results_table))
+    write_to_csv(results_table, save_results)

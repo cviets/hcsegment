@@ -25,11 +25,11 @@ def main():
     nuclear_parser.add_argument("-o", "--output", type=str, required=False, help="Path to directory to save masks")
     nuclear_parser.add_argument("-s", "--save", type=str, required=False, help="Path to CSV file to save cell counts")
     nuclear_parser.add_argument("-c", "--channel", type=int, default=0, help="Nuclear channel number (0-indexed)")
-    nuclear_parser.add_argument("-m", "--min_size", type=int, default=80, help="Min object size")
+    nuclear_parser.add_argument("-m", "--min_size", type=int, default=150, help="Min object size")
     nuclear_parser.add_argument("-M", "--max_size", type=int, default=2000, help="Max object size")
     nuclear_parser.add_argument("-d", "--dist", type=int, default=20, required=False, help="Min distance between objects")
-    nuclear_parser.add_argument("-p", "--percentile", type=float, default=50, required=False, help="Pixels with intensity below the p-th percentile will not appear in the mask (higher = more strict)")
-    nuclear_parser.add_argument("-t", "--threshold", type=float, default=0.25, required=False, help="Threshold in [0,1] to determine whether pixel gets masked (higher = more strict)")
+    nuclear_parser.add_argument("-p", "--percentile", type=float, default=75, required=False, help="Pixels with intensity below the p-th percentile will not appear in the mask (higher = more strict)")
+    nuclear_parser.add_argument("-t", "--threshold", type=float, default=0.5, required=False, help="Threshold in [0,1] to determine whether pixel gets masked (higher = more strict)")
 
     # neurite_parser = subparsers.add_parser("mask-neurites", help="Segment and count neurite area", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     # neurite_parser.add_argument("-i", "--input", type=str, required=True, help="Path to directory containing images")
@@ -49,7 +49,11 @@ def main():
     #     denoise_main(args.input)
 
     elif args.command == "mask":
-        nuclear_main(args.input, args.output, args.channel, args.dist, args.min_size, args.max_size, args.save, args.threshold, args.percentile)
+        if args.output is None or args.output == "":
+            output = os.path.join(args.input, "..", "MASKS")
+        if args.save is None or args.save == "":
+            save = os.path.join(args.input, "..", "COUNT.csv")
+        nuclear_main(args.input, output, args.channel, args.dist, args.min_size, args.max_size, save, args.threshold, args.percentile)
 
     # elif args.command == "mask-neurites":
     #     neurite_main(args.input, args.output, args.channel, args.save)

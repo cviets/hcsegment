@@ -55,22 +55,28 @@ def stitch(root_dir: str, store_path: str, rows: int, columns: int, wavelengths:
     timepoints = get_timepoint_dirs(root_dir)
     stitched_images = get_stitched_images(store_path)
 
-    # get list of all image names
+    # get image wells, sites, and wavelengths
     for i, timepoint in enumerate(timepoints):
         if i == 0:
-            imgs = set(glob(os.path.join(timepoints[0], "*.tif")))
+            imgs_list = glob(os.path.join(timepoints[0], "*.tif"))
+            positions, sites, channels = get_positions(imgs_list)
         else:
-            current_imgs = set(glob(os.path.join(timepoint, "*.tif")))
-            imgs = imgs.intersection(current_imgs)
-    imgs_list = list(imgs)
+            current_imgs = glob(os.path.join(timepoint, "*.tif"))
+            cur_positions, cur_sites, cur_channels = get_positions(current_imgs)
+            positions = positions.intersection(cur_positions)
+            sites = sites.intersection(cur_sites)
+            channels = channels.intersection(cur_channels)
+
+    position_list = sorted(list(positions))
+    sites = sorted(list(sites))
+    channels = sorted(list(channels))
     
-    position_list, sites, channels = get_positions(imgs_list)
     position_list = remove_already_stitched(position_list, stitched_images)
 
     assert len(channels) == wavelengths, f"Number of wavelengths specified ({wavelengths}) does not match number of wavelengths in images ({len(channels)})"
     assert len(sites) == rows*columns, f"Number of sites in images ({len(sites)}) does not equal specified rows*columns ({rows*columns})"
 
-    example_img = tifffile.imread(imgs_list[0])
+    example_img = tifffile.imread(glob(os.path.join(timepoints[0], "*.tif"))[0])
     chunk_height, chunk_width = example_img.shape[0], example_img.shape[1]
     shape = (len(timepoints), wavelengths, 1, chunk_height*rows, chunk_width*columns)
     files_all = np.array([sort_files(glob(os.path.join(tp_dir, "*.tif")), position_list, sites, channels) for tp_dir in timepoints])

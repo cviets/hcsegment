@@ -5,3 +5,5 @@ tb_logs
 venv
 *.pyc
 .venv
+denoise.py
+neurite_segment.py
